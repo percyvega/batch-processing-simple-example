@@ -1,4 +1,4 @@
-package com.percyvega;
+package com.percyvega.model;
 
 /**
  * Created by Percy Vega on 6/1/2015.

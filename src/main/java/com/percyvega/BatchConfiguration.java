@@ -1,5 +1,7 @@
 package com.percyvega;
 
+import com.percyvega.model.PersonCSV;
+import com.percyvega.model.PersonDB;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;

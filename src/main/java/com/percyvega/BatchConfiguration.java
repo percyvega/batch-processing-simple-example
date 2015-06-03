@@ -2,6 +2,8 @@ package com.percyvega;
 
 import com.percyvega.model.PersonCSV;
 import com.percyvega.model.PersonDB;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;
@@ -30,10 +32,10 @@ import javax.sql.DataSource;
 public class BatchConfiguration {
 
     @Bean
-    public ItemReader<PersonCSV> reader() {
-        FlatFileItemReader<PersonCSV> reader = new FlatFileItemReader<PersonCSV>();
-        reader.setResource(new ClassPathResource("us-500.csv"));
-        reader.setLineMapper(new DefaultLineMapper<PersonCSV>() {{
+    public ItemReader<PersonCSV> itemReader() {
+        FlatFileItemReader<PersonCSV> flatFileItemReader = new FlatFileItemReader<PersonCSV>();
+        flatFileItemReader.setResource(new ClassPathResource("us-500.csv"));
+        flatFileItemReader.setLineMapper(new DefaultLineMapper<PersonCSV>() {{
             setLineTokenizer(new DelimitedLineTokenizer() {{
                 setNames(new String[]{"firstName", "lastName", "street", "city", "state", "zipCode"});
             }});
@@ -41,41 +43,52 @@ public class BatchConfiguration {
                 setTargetType(PersonCSV.class);
             }});
         }});
-        return reader;
+        return flatFileItemReader;
     }
 
     @Bean
-    public ItemProcessor<PersonCSV, PersonDB> processor() {
-        return new PersonItemProcessor();
+    public ItemProcessor<PersonCSV, PersonDB> itemProcessor() {
+        final Logger LOGGER = LoggerFactory.getLogger(BatchConfiguration.class);
+        return new ItemProcessor<PersonCSV, PersonDB>() {
+            @Override
+            public PersonDB process(final PersonCSV personCSV) throws Exception {
+                final String fullName = personCSV.getFirstName() + " " + personCSV.getLastName();
+                final String address = personCSV.getStreet() + ", " + personCSV.getCity() + ", " + personCSV.getState() + " " + personCSV.getZipCode();
+                final PersonDB personDB = new PersonDB(fullName, address);
+
+                LOGGER.info("Converting " + personCSV + " into " + personDB);
+                return personDB;
+            }
+        };
     }
 
     @Bean
-    public ItemWriter<PersonDB> writer(DataSource dataSource) {
-        JdbcBatchItemWriter<PersonDB> writer = new JdbcBatchItemWriter<PersonDB>();
-        writer.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<PersonDB>());
-        writer.setSql("INSERT INTO people (full_name, address) VALUES (:fullName, :address)");
-        writer.setDataSource(dataSource);
-        return writer;
+    public ItemWriter<PersonDB> itemWriter(DataSource dataSource) {
+        JdbcBatchItemWriter<PersonDB> jdbcBatchItemWriter = new JdbcBatchItemWriter<PersonDB>();
+        jdbcBatchItemWriter.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<PersonDB>());
+        jdbcBatchItemWriter.setSql("INSERT INTO people (full_name, address) VALUES (:fullName, :address)");
+        jdbcBatchItemWriter.setDataSource(dataSource);
+        return jdbcBatchItemWriter;
     }
 
     @Bean
-    public Job importUserJob(JobBuilderFactory jobs, Step s1, JobExecutionListener listener) {
-        return jobs.get("importUserJob")
+    public Job importUserJob(JobBuilderFactory jobBuilderFactory, Step step, JobExecutionListener jobExecutionListener) {
+        return jobBuilderFactory.get("importUserJob")
                 .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .flow(s1)
+                .listener(jobExecutionListener)
+                .flow(step)
                 .end()
                 .build();
     }
 
     @Bean
-    public Step step1(StepBuilderFactory stepBuilderFactory, ItemReader<PersonCSV> reader,
-                      ItemWriter<PersonDB> writer, ItemProcessor<PersonCSV, PersonDB> processor) {
-        return stepBuilderFactory.get("step1")
+    public Step step(StepBuilderFactory stepBuilderFactory, ItemReader<PersonCSV> itemReader,
+                      ItemWriter<PersonDB> itemWriter, ItemProcessor<PersonCSV, PersonDB> itemProcessor) {
+        return stepBuilderFactory.get("step")
                 .<PersonCSV, PersonDB> chunk(10)
-                .reader(reader)
-                .processor(processor)
-                .writer(writer)
+                .reader(itemReader)
+                .processor(itemProcessor)
+                .writer(itemWriter)
                 .build();
     }
 

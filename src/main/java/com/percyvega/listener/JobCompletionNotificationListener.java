@@ -1,4 +1,4 @@
-package com.percyvega;
+package com.percyvega.listener;
 
 import com.percyvega.model.PersonDB;
 import org.slf4j.Logger;
@@ -42,7 +42,7 @@ public class JobCompletionNotificationListener extends JobExecutionListenerSuppo
             });
 
             for (PersonDB personDB : results) {
-                LOGGER.info("Found <" + personDB + "> in the database.");
+                LOGGER.info("Found " + personDB + " in the database.");
             }
         } else {
             LOGGER.info("!!!!!!!!!!!!!!!!!!!!!!!!!!!!! jobExecution.getStatus(): " + jobExecution.getStatus() + " !!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
